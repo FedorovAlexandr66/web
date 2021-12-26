@@ -9,13 +9,13 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 
-def get_top_inquiry(job_titles: tuple[str, str], count: int = 15):
-    inquiry = (f"SELECT LOWER(qualification) as 'qualification', count(*) as 'count' FROM works "
+def get_top_inquery(job_titles: tuple[str, str], count: int = 15):
+    inquery = (f"SELECT LOWER(qualification) as 'qualification', count(*) as 'count' FROM works "
              f"WHERE qualification IS NOT NULL AND "
              f"(LOWER(jobTitle) like '%{job_titles[0]}%' OR LOWER(jobTitle) like '%{job_titles[1]}%')"
              f"GROUP BY LOWER(qualification) "
              f"ORDER BY count DESC LIMIT {count}")
-    return inquiry
+    return inquery
 
 
 def get_con():
@@ -28,7 +28,7 @@ app = Flask(__name__)
 
 
 @app.route("/")
-def cv_number():
+def cv_index():
     cvs = get_cv()
     result = ""
     for i, cv in enumerate(cvs):
@@ -43,7 +43,7 @@ def cv_number():
 def dashboard():
     con = get_con()
     result = list(con.execute("SELECT COUNT(*) as 'count', strftime('%Y', dateModify) as 'year' "
-                   "FROM works WHERE year IS NOT NULL GROUP BY year"))
+                           "FROM works WHERE year IS NOT NULL GROUP BY year"))
     con.close()
     data = [r["count"] for r in result]
     labels = [r["year"] for r in result]
@@ -59,7 +59,7 @@ def dict_factory(cursor, row):
     return d
 
 
-def get_cv():
+def receive_cv():
     con = sqlite3.connect('works.sqlite')
     con.row_factory = dict_factory
     result = list(con.execute('select * from works limit 20'))
@@ -75,12 +75,31 @@ def plot_png():
     return Response(output.getvalue(), mimetype='image/png')
 
 
-def create_figure():
+def build_figure():
     fig = Figure()
     axis = fig.add_subplot(1, 1, 1)
     xs = range(100)
     ys = [random.randint(1, 50) for x in xs]
     axis.plot(xs, ys)
     return fig
+
+
+@app.route("/managers")
+def edu_managers():
+    con = get_con()
+    result = list(con.execute(get_top_inquery(("manager", "менеджер"))))
+    data = [r["count"] for r in result]
+    labels = [r["qualification"] for r in result]
+    return render_template('d2.html', cvs=result, data=data, labels=labels, ql="менеджеров")
+
+
+@app.route("/engineer")
+def edu_engineers():
+    con = get_con()
+    result = list(con.execute(get_top_inquery(("engineer", "инженер"))))
+    data = [r["count"] for r in result]
+    labels = [r["qualification"] for r in result]
+    return render_template('d2.html', cvs=result, data=data, labels=labels, ql="инженеров")
+
 
 app.run()
